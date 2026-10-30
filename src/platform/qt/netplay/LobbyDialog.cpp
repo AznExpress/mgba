@@ -78,15 +78,35 @@ LobbyDialog::LobbyDialog(ConfigController* config, const QString& romPath, QWidg
 	form->addRow(tr("Your name:"), m_name);
 
 	auto* romRow = new QHBoxLayout;
-	m_rom = new QLineEdit(romPath.isEmpty() ? m_config->getQtOption("rom", kSettingsGroup).toString() : romPath);
-	auto* browse = new QPushButton(tr("Browse..."));
-	connect(browse, &QPushButton::clicked, this, &LobbyDialog::browseRom);
+	QString initialRom = romPath.isEmpty() ? m_config->getQtOption("rom", kSettingsGroup).toString() : romPath;
+	m_rom = new QLineEdit(initialRom);
+	auto* browseRomButton = new QPushButton(tr("Browse..."));
+	connect(browseRomButton, &QPushButton::clicked, this, &LobbyDialog::browseRom);
 	romRow->addWidget(m_rom);
-	romRow->addWidget(browse);
+	romRow->addWidget(browseRomButton);
 	form->addRow(tr("ROM:"), romRow);
+
+	auto* saveRow = new QHBoxLayout;
+	m_save = new QLineEdit;
+	m_save->setPlaceholderText(tr("Leave empty for a new game"));
+	auto* browseSaveButton = new QPushButton(tr("Browse..."));
+	connect(browseSaveButton, &QPushButton::clicked, this, &LobbyDialog::browseSave);
+	saveRow->addWidget(m_save);
+	saveRow->addWidget(browseSaveButton);
+	form->addRow(tr("Your save:"), saveRow);
+
+	QString rememberedSave = m_config->getQtOption("save", kSettingsGroup).toString();
+	QString rememberedRom = m_config->getQtOption("rom", kSettingsGroup).toString();
+	if (!rememberedSave.isEmpty() && (romPath.isEmpty() || romPath == rememberedRom)) {
+		m_save->setText(rememberedSave);
+	} else {
+		fillDefaultSave(true);
+	}
+	m_autoSavePath = savePathFor(m_rom->text());
 
 	m_writeBack = new QCheckBox(tr("Write my save back when the session ends (keeps a backup)"));
 	m_writeBack->setChecked(m_config->getQtOption("writeBackSave", kSettingsGroup).isNull() || m_config->getQtOption("writeBackSave", kSettingsGroup).toBool());
+	m_writeBack->setToolTip(tr("Only your cartridge is written, to the save file you picked. The other players' saves stay on their machines."));
 	form->addRow(QString(), m_writeBack);
 
 	auto* hostBox = new QGroupBox(tr("Host a room"));
@@ -171,11 +191,12 @@ LobbyDialog::LobbyDialog(ConfigController* config, const QString& romPath, QWidg
 	connect(&m_socket, &QWebSocket::connected, this, &LobbyDialog::connected);
 	connect(&m_socket, &QWebSocket::disconnected, this, &LobbyDialog::disconnected);
 	connect(&m_socket, &QWebSocket::textMessageReceived, this, &LobbyDialog::messageReceived);
-	connect(m_rom, &QLineEdit::textChanged, this, &LobbyDialog::updateButtons);
+	connect(m_rom, &QLineEdit::textChanged, this, &LobbyDialog::romChanged);
 
 	m_server->setObjectName("server");
 	m_name->setObjectName("name");
 	m_rom->setObjectName("rom");
+	m_save->setObjectName("save");
 	m_maxPlayers->setObjectName("maxPlayers");
 	m_inputDelay->setObjectName("inputDelay");
 	m_create->setObjectName("create");
@@ -194,6 +215,38 @@ void LobbyDialog::browseRom() {
 	QString path = GBAApp::app()->getOpenFileName(this, tr("Select ROM"), tr("Game Boy Advance ROMs (*.gba *.zip *.agb *.mb);;All files (*)"));
 	if (!path.isEmpty()) {
 		m_rom->setText(path);
+	}
+}
+
+void LobbyDialog::browseSave() {
+	QString start = m_save->text();
+	if (start.isEmpty()) {
+		start = savePathFor(m_rom->text());
+	}
+	QString path = GBAApp::app()->getOpenFileName(this, tr("Select your save"), tr("Save games (*.sav);;All files (*)"), start);
+	if (!path.isEmpty()) {
+		m_save->setText(path);
+		m_autoSavePath.clear();
+	}
+}
+
+void LobbyDialog::romChanged() {
+	fillDefaultSave(false);
+	updateButtons();
+}
+
+void LobbyDialog::fillDefaultSave(bool force) {
+	if (m_rom->text().trimmed().isEmpty()) {
+		if (force) {
+			m_save->clear();
+		}
+		m_autoSavePath.clear();
+		return;
+	}
+	QString autoPath = savePathFor(m_rom->text());
+	if (force || m_save->text().isEmpty() || QFileInfo(m_save->text()) == QFileInfo(m_autoSavePath)) {
+		m_save->setText(autoPath);
+		m_autoSavePath = autoPath;
 	}
 }
 
@@ -290,7 +343,7 @@ void LobbyDialog::messageReceived(const QString& text) {
 	} else if (type == "started") {
 		NetplaySessionParams params;
 		params.romPath = m_rom->text();
-		params.savePath = savePathFor(params.romPath);
+		params.savePath = m_save->text().trimmed();
 		params.relayHost = QUrl(m_server->text().trimmed()).host();
 		params.relayPort = message.value("relay_port").toInt();
 		params.token = static_cast<quint64>(message.value("token").toDouble());
@@ -361,6 +414,7 @@ void LobbyDialog::updateButtons() {
 	m_join->setEnabled(idle && m_code->text().size() == 6);
 	m_code->setEnabled(idle);
 	m_rom->setEnabled(idle);
+	m_save->setEnabled(idle);
 	m_server->setEnabled(idle);
 	m_name->setEnabled(idle);
 	m_roomBox->setVisible(m_inRoom);
@@ -378,6 +432,7 @@ void LobbyDialog::saveSettings() {
 	m_config->setQtOption("server", m_server->text().trimmed(), kSettingsGroup);
 	m_config->setQtOption("name", m_name->text().trimmed(), kSettingsGroup);
 	m_config->setQtOption("rom", m_rom->text(), kSettingsGroup);
+	m_config->setQtOption("save", m_save->text().trimmed(), kSettingsGroup);
 	m_config->setQtOption("maxPlayers", m_maxPlayers->value(), kSettingsGroup);
 	m_config->setQtOption("inputDelay", m_inputDelay->value(), kSettingsGroup);
 	m_config->setQtOption("writeBackSave", m_writeBack->isChecked(), kSettingsGroup);

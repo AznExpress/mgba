@@ -37,6 +37,8 @@ signals:
 
 private slots:
 	void browseRom();
+	void browseSave();
+	void romChanged();
 	void createRoom();
 	void joinRoom();
 	void startGame();
@@ -54,6 +56,7 @@ private:
 	void updateButtons();
 	void saveSettings();
 	QString savePathFor(const QString& romPath) const;
+	void fillDefaultSave(bool force);
 
 	ConfigController* m_config;
 	QWebSocket m_socket;
@@ -66,6 +69,8 @@ private:
 	QLineEdit* m_server;
 	QLineEdit* m_name;
 	QLineEdit* m_rom;
+	QLineEdit* m_save;
+	QString m_autoSavePath;
 	QSpinBox* m_maxPlayers;
 	QSpinBox* m_inputDelay;
 	QCheckBox* m_writeBack;
