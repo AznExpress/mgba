@@ -88,9 +88,18 @@ bool NetplayUDPTransportCreate(struct NetplayTransport* transport, uint16_t loca
 			SocketSubsystemDeinit();
 			return false;
 		}
-		family = result->ai_family;
-		memcpy(&udp->dest[i], result->ai_addr, result->ai_addrlen);
-		udp->destLen[i] = result->ai_addrlen;
+		// Prefer IPv4: some relay hosts (Fly.io) publish AAAA records but only route UDP over IPv4
+		const struct addrinfo* chosen = result;
+		const struct addrinfo* candidate;
+		for (candidate = result; candidate; candidate = candidate->ai_next) {
+			if (candidate->ai_family == AF_INET) {
+				chosen = candidate;
+				break;
+			}
+		}
+		family = chosen->ai_family;
+		memcpy(&udp->dest[i], chosen->ai_addr, chosen->ai_addrlen);
+		udp->destLen[i] = chosen->ai_addrlen;
 		freeaddrinfo(result);
 	}
 	udp->nDest = nHosts;
