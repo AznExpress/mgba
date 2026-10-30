@@ -37,6 +37,7 @@ protected:
 	void paintEvent(QPaintEvent*) override;
 	void keyPressEvent(QKeyEvent*) override;
 	void keyReleaseEvent(QKeyEvent*) override;
+	void focusInEvent(QFocusEvent*) override;
 	void focusOutEvent(QFocusEvent*) override;
 	void closeEvent(QCloseEvent*) override;
 
@@ -48,6 +49,7 @@ private slots:
 private:
 	void setupAudio();
 	void drawStats(QPainter&);
+	int mapKey(int qtKey) const;
 
 	NetplayController m_controller;
 	InputController* m_input;

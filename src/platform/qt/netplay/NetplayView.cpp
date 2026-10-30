@@ -21,6 +21,7 @@
 #endif
 
 #include <mgba/feature/netplay.h>
+#include <mgba/internal/gba/input.h>
 
 using namespace QGBA;
 
@@ -137,13 +138,24 @@ void NetplayView::pollInput() {
 	m_controller.setKeys((m_keyboard | gamepad) & 0x3FF);
 }
 
+int NetplayView::mapKey(int qtKey) const {
+	// On-screen "Press A" means the GBA A button. mGBA's default keyboard map uses X for A and A for L.
+	if (qtKey == Qt::Key_A) {
+		return GBA_KEY_A;
+	}
+	if (qtKey == Qt::Key_B) {
+		return GBA_KEY_B;
+	}
+	return m_input ? m_input->mapKeyboard(qtKey) : -1;
+}
+
 void NetplayView::keyPressEvent(QKeyEvent* event) {
 	if (event->key() == Qt::Key_F3) {
 		m_showStats = !m_showStats;
 		update();
 		return;
 	}
-	int key = m_input ? m_input->mapKeyboard(event->key()) : -1;
+	int key = mapKey(event->key());
 	if (key < 0) {
 		QWidget::keyPressEvent(event);
 		return;
@@ -156,7 +168,7 @@ void NetplayView::keyPressEvent(QKeyEvent* event) {
 }
 
 void NetplayView::keyReleaseEvent(QKeyEvent* event) {
-	int key = m_input ? m_input->mapKeyboard(event->key()) : -1;
+	int key = mapKey(event->key());
 	if (key < 0) {
 		QWidget::keyReleaseEvent(event);
 		return;
@@ -168,10 +180,16 @@ void NetplayView::keyReleaseEvent(QKeyEvent* event) {
 	event->accept();
 }
 
+void NetplayView::focusInEvent(QFocusEvent* event) {
+	QWidget::focusInEvent(event);
+	update();
+}
+
 void NetplayView::focusOutEvent(QFocusEvent* event) {
 	m_keyboard = 0;
 	pollInput();
 	QWidget::focusOutEvent(event);
+	update();
 }
 
 void NetplayView::closeEvent(QCloseEvent* event) {
@@ -223,6 +241,18 @@ void NetplayView::paintEvent(QPaintEvent*) {
 	if (m_showStats) {
 		drawStats(painter);
 	}
+	if (!hasFocus() && !m_finished && m_controller.stats().running) {
+		QString hint = tr("Click this window to control player %1\nA = GBA A, B = GBA B, X = A, Z = B")
+		                   .arg(m_controller.params().slot + 1);
+		QFont font = painter.font();
+		font.setPointSize(11);
+		painter.setFont(font);
+		QRect box = rect().adjusted(16, 16, -16, -16);
+		QRect bounds = painter.boundingRect(box, Qt::AlignBottom | Qt::AlignHCenter | Qt::TextWordWrap, hint).adjusted(-12, -8, 12, 8);
+		painter.fillRect(bounds, QColor(0, 0, 0, 180));
+		painter.setPen(QColor(255, 220, 120));
+		painter.drawText(box, Qt::AlignBottom | Qt::AlignHCenter | Qt::TextWordWrap, hint);
+	}
 }
 
 void NetplayView::drawStats(QPainter& painter) {
@@ -255,6 +285,14 @@ void NetplayView::drawStats(QPainter& painter) {
 	} else if (stats.desyncs) {
 		lines << tr("Desyncs %1, recovered %2").arg(stats.desyncs).arg(stats.resyncs);
 	}
+	QStringList held;
+	if (m_keyboard & (1 << GBA_KEY_A)) held << QStringLiteral("A");
+	if (m_keyboard & (1 << GBA_KEY_B)) held << QStringLiteral("B");
+	if (m_keyboard & (1 << GBA_KEY_START)) held << QStringLiteral("Start");
+	if (m_keyboard & (1 << GBA_KEY_SELECT)) held << QStringLiteral("Select");
+	if (m_keyboard & (1 << GBA_KEY_L)) held << QStringLiteral("L");
+	if (m_keyboard & (1 << GBA_KEY_R)) held << QStringLiteral("R");
+	lines << tr("Held %1").arg(held.isEmpty() ? tr("none") : held.join(QStringLiteral(" ")));
 	lines << tr("F3 hides this");
 
 	QFont font = painter.font();
