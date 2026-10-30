@@ -50,6 +50,9 @@ struct NetplayStats {
 	unsigned resyncs = 0;
 	bool resyncing = false;
 	double emulationMs = 0;
+	int sioMode = -1;
+	int sioReady = 0;
+	quint64 sioTransfers = 0;
 };
 
 // Runs a netplay session on a worker thread: all players' cores, the rollback session and the network

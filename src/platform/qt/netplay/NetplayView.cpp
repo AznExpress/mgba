@@ -236,6 +236,20 @@ void NetplayView::drawStats(QPainter& painter) {
 	lines << tr("Rollbacks %1 (last %2, max %3)").arg(stats.rollbacks).arg(stats.lastRollbackDepth).arg(stats.maxRollbackDepth);
 	lines << tr("Frame advantage %1   Waits %2").arg(stats.advantage, 0, 'f', 1).arg(stats.stalls);
 	lines << tr("Emulation %1 ms/frame").arg(stats.emulationMs, 0, 'f', 1);
+	QString sio;
+	switch (stats.sioMode) {
+	case 0: sio = QStringLiteral("NORMAL8"); break;
+	case 1: sio = QStringLiteral("NORMAL32"); break;
+	case 2: sio = QStringLiteral("MULTI"); break;
+	case 3: sio = QStringLiteral("UART"); break;
+	case 8: sio = QStringLiteral("GPIO"); break;
+	case 12: sio = QStringLiteral("JOYBUS"); break;
+	default: sio = tr("off"); break;
+	}
+	if (stats.sioReady) {
+		sio += QStringLiteral(" ready");
+	}
+	lines << tr("Link %1   transfers %2").arg(sio).arg(stats.sioTransfers);
 	if (stats.resyncing) {
 		lines << tr("Desync detected, resynchronizing...");
 	} else if (stats.desyncs) {

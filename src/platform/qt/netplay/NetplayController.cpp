@@ -347,6 +347,13 @@ QString NetplayController::runSession() {
 				m_stats.resyncs = client->stats.resyncs;
 				m_stats.resyncing = client->awaitingResync || client->desynced;
 				m_stats.emulationMs = emulationMs;
+				int sioMode = -1;
+				int sioReady = 0;
+				uint64_t sioTransfers = 0;
+				NetplayLinkSioInfo(&machine->link, m_params.slot, &sioMode, &sioReady, &sioTransfers);
+				m_stats.sioMode = sioMode;
+				m_stats.sioReady = sioReady;
+				m_stats.sioTransfers = sioTransfers;
 			}
 		}
 		NetplayClientSendBye(client.get(), NetplayNowMs());
@@ -369,11 +376,13 @@ QString NetplayController::runSession() {
 
 void NetplayController::publishFrame(Machine* machine) {
 	const mColor* video = machine->video[m_params.slot].data();
+	// Same conversion DisplayQt uses: native pixels are XBGR, not RGBX
 	QImage image(reinterpret_cast<const uchar*>(video), machine->width, machine->height,
 	             machine->width * sizeof(mColor), QImage::Format_ARGB32);
+	image = image.convertToFormat(QImage::Format_RGB32).rgbSwapped();
 	{
 		QMutexLocker locker(&m_frameMutex);
-		m_frame = image.convertToFormat(QImage::Format_RGB32);
+		m_frame = image;
 	}
 	emit frameAvailable();
 }

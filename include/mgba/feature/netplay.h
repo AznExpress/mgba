@@ -86,6 +86,8 @@ MGBA_EXPORT void NetplayPrepareCore(struct mCore* core, int64_t rtcStartMs);
 MGBA_EXPORT void NetplayLinkInit(struct NetplayLink*, struct mCore* const* cores, int nPlayers);
 MGBA_EXPORT void NetplayLinkDeinit(struct NetplayLink*);
 MGBA_EXPORT void NetplayLinkRunFrame(struct NetplayLink*, const uint16_t* keys);
+// mode is GBASIOMode (or -1); ready is the MULTI Ready bit; transfers is how many SIO transfers have started
+MGBA_EXPORT void NetplayLinkSioInfo(const struct NetplayLink*, int player, int* mode, int* ready, uint64_t* transfers);
 MGBA_EXPORT size_t NetplayLinkSnapshotCapacity(const struct NetplayLink*);
 MGBA_EXPORT size_t NetplayLinkSnapshot(struct NetplayLink*, void* out);
 MGBA_EXPORT bool NetplayLinkRestore(struct NetplayLink*, const void* in, size_t size);

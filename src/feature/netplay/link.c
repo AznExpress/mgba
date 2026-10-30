@@ -29,7 +29,7 @@ struct NetplaySnapshotHeader {
 	uint32_t saveSize[NETPLAY_MAX_PLAYERS];
 };
 
-static struct GBA* _gba(struct NetplayLink* link, int player) {
+static struct GBA* _gba(const struct NetplayLink* link, int player) {
 	return link->cores[player]->board;
 }
 
@@ -384,6 +384,22 @@ void NetplayLinkDeinit(struct NetplayLink* link) {
 		core->setPeripheral(core, mPERIPH_GBA_LINK_PORT, NULL);
 	}
 	link->nPlayers = 0;
+}
+
+void NetplayLinkSioInfo(const struct NetplayLink* link, int player, int* mode, int* ready, uint64_t* transfers) {
+	if (mode) {
+		*mode = (player >= 0 && player < link->nPlayers) ? (int) _gba(link, player)->sio.mode : -1;
+	}
+	if (ready) {
+		*ready = 0;
+		if (player >= 0 && player < link->nPlayers) {
+			struct GBASIO* sio = &_gba(link, player)->sio;
+			*ready = sio->mode == GBA_SIO_MULTI && GBASIOMultiplayerIsReady(sio->siocnt);
+		}
+	}
+	if (transfers) {
+		*transfers = link->transfersStarted;
+	}
 }
 
 void NetplayLinkRunFrame(struct NetplayLink* link, const uint16_t* keys) {
