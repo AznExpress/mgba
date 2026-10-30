@@ -11,6 +11,14 @@ if(ENABLE_VFS)
 		updater.c)
 endif()
 
+if(M_CORE_GBA)
+	list(APPEND SOURCE_FILES
+		netplay/link.c
+		netplay/session.c
+		netplay/sync.c
+		netplay/transport.c)
+endif()
+
 set(GUI_FILES
 	gui/cheats.c
 	gui/gui-config.c

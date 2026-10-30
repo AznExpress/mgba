@@ -261,6 +261,23 @@ if(${QT}Multimedia_FOUND)
 	set(CPACK_DEBIAN_PACKAGE_DEPENDS "${CPACK_DEBIAN_PACKAGE_DEPENDS},libqt${QT_V}multimedia${QT_V}")
 endif()
 
+if(M_CORE_GBA)
+	find_package(${QT} COMPONENTS WebSockets QUIET)
+endif()
+if(${QT}WebSockets_FOUND)
+	list(APPEND SOURCE_FILES
+		netplay/LobbyDialog.cpp
+		netplay/NetplayController.cpp
+		netplay/NetplayView.cpp)
+	list(APPEND QT_LIBRARIES ${QT}::WebSockets)
+	if(WIN32)
+		list(APPEND QT_LIBRARIES winmm)
+	endif()
+	list(APPEND QT_DEFINES BUILD_NETPLAY_UI)
+else()
+	message(STATUS "Qt WebSockets not found; building without the netplay lobby")
+endif()
+
 if(NOT AUDIO_SRC)
 	message(WARNING "No supported audio modules found")
 	set(BUILD_QT OFF PARENT_SCOPE)
@@ -495,6 +512,19 @@ if(QT_STATIC)
 endif()
 target_link_libraries(${BINARY_NAME}-qt ${PLATFORM_LIBRARY} ${BINARY_NAME} ${QT_LIBRARIES})
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "${CPACK_DEBIAN_PACKAGE_DEPENDS}" PARENT_SCOPE)
+
+option(BUILD_NETPLAY_QT_TEST "Build the end-to-end netplay UI test" OFF)
+if(BUILD_NETPLAY_QT_TEST AND ${QT}WebSockets_FOUND)
+	add_executable(${BINARY_NAME}-qt-netplay-test test/netplay.cpp ${SOURCE_FILES} ${PLATFORM_SRC} ${UI_SRC} ${AUDIO_SRC} ${RESOURCES})
+	set_target_properties(${BINARY_NAME}-qt-netplay-test PROPERTIES
+		COMPILE_DEFINITIONS "${FEATURE_DEFINES};${FUNCTION_DEFINES};${OS_DEFINES};${QT_DEFINES}"
+		COMPILE_OPTIONS "${FEATURE_FLAGS}"
+		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/netplay-qt-test")
+	target_link_libraries(${BINARY_NAME}-qt-netplay-test ${PLATFORM_LIBRARY} ${BINARY_NAME} ${QT_LIBRARIES})
+	if(WIN32)
+		target_link_libraries(${BINARY_NAME}-qt-netplay-test dwmapi)
+	endif()
+endif()
 
 if(UNIX AND NOT APPLE)
 	install(FILES ${PROJECT_SOURCE_DIR}/res/mgba-qt.desktop DESTINATION share/applications RENAME io.mgba.${PROJECT_NAME}.desktop COMPONENT ${BINARY_NAME}-qt)

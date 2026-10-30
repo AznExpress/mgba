@@ -18,6 +18,11 @@
 #include <dwmapi.h>
 #endif
 
+#ifdef BUILD_NETPLAY_UI
+#include "netplay/LobbyDialog.h"
+#include "netplay/NetplayView.h"
+#endif
+
 #ifdef USE_SQLITE3
 #include "ArchiveInspector.h"
 #include "library/LibraryController.h"
@@ -538,6 +543,40 @@ void Window::openView(QWidget* widget) {
 	widget->show();
 }
 
+#ifdef BUILD_NETPLAY_UI
+void Window::openNetplayLobby() {
+	if (m_netplayView) {
+		m_netplayView->activateWindow();
+		m_netplayView->raise();
+		return;
+	}
+	if (m_netplayLobby) {
+		m_netplayLobby->activateWindow();
+		m_netplayLobby->raise();
+		return;
+	}
+	QString romPath = m_controller ? m_controller->path() : QString();
+	LobbyDialog* lobby = new LobbyDialog(m_config, romPath);
+	m_netplayLobby = lobby;
+	connect(this, &Window::shutdown, lobby, &QWidget::close);
+	connect(lobby, &LobbyDialog::sessionReady, this, [this](const NetplaySessionParams& params) {
+		if (m_controller) {
+			// The local game would fight the session for audio and input
+			m_controller->setPaused(true);
+		}
+		NetplayView* view = new NetplayView(params, &m_inputController);
+		m_netplayView = view;
+		openView(view);
+		QString error = view->start();
+		if (!error.isEmpty()) {
+			view->close();
+			QMessageBox::critical(this, tr("Netplay"), error);
+		}
+	});
+	lobby->show();
+}
+#endif
+
 void Window::showMenu(bool show) {
 	if (auto hideMenu = m_actions.getAction("hideMenu")) {
 		hideMenu->setActive(!show);
@@ -782,8 +821,9 @@ void Window::showEvent(QShowEvent* event) {
 	m_wasOpened = true;
 #ifdef Q_OS_WIN
 	HWND hwnd = reinterpret_cast<HWND>(winId());
-	DWM_WINDOW_CORNER_PREFERENCE cornerPref = DWMWCP_DONOTROUND;
-	DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &cornerPref, sizeof(cornerPref));
+	// DWMWA_WINDOW_CORNER_PREFERENCE and DWMWCP_DONOTROUND; older MinGW headers lack the names
+	DWORD cornerPref = 1;
+	DwmSetWindowAttribute(hwnd, 33, &cornerPref, sizeof(cornerPref));
 #endif
 	if (m_initialSize.isValid()) {
 		resizeFrame(m_initialSize);
@@ -1766,6 +1806,11 @@ void Window::setupMenu(QMenuBar* menubar) {
 	m_actions.addBooleanAction(tr("Hide &menu"), "hideMenu", [this](bool hidden) {
 		showMenu(!hidden);
 	}, "av", QKeySequence("Ctrl+M"));
+#endif
+
+#ifdef BUILD_NETPLAY_UI
+	m_actions.addMenu(tr("&Netplay"), "netplay");
+	m_actions.addAction(tr("Host or join a room..."), "netplayLobby", this, &Window::openNetplayLobby, "netplay");
 #endif
 
 	m_actions.addMenu(tr("&Tools"), "tools");

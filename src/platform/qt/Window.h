@@ -126,6 +126,10 @@ public slots:
 	void scriptingOpen();
 #endif
 
+#ifdef BUILD_NETPLAY_UI
+	void openNetplayLobby();
+#endif
+
 protected:
 	virtual void keyPressEvent(QKeyEvent* event) override;
 	virtual void keyReleaseEvent(QKeyEvent* event) override;
@@ -259,6 +263,10 @@ private:
 	QPointer<SensorView> m_sensorView;
 	QPointer<DolphinConnector> m_dolphinView;
 	QPointer<FrameView> m_frameView;
+#ifdef BUILD_NETPLAY_UI
+	QPointer<QWidget> m_netplayLobby;
+	QPointer<QWidget> m_netplayView;
+#endif
 
 #ifdef USE_FFMPEG
 	QPointer<VideoView> m_videoView;

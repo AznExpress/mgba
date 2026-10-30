@@ -21,6 +21,12 @@ if(BUILD_TEST)
 	install(TARGETS ${BINARY_NAME}-fuzz tbl-fuzz DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT ${BINARY_NAME}-test)
 endif()
 
+if(BUILD_NETPLAY_TEST AND M_CORE_GBA)
+	add_executable(${BINARY_NAME}-netplay-test ${CMAKE_CURRENT_SOURCE_DIR}/netplay-test-main.c)
+	target_link_libraries(${BINARY_NAME}-netplay-test ${BINARY_NAME} ${OS_LIB})
+	set_target_properties(${BINARY_NAME}-netplay-test PROPERTIES COMPILE_DEFINITIONS "${OS_DEFINES};${FEATURE_DEFINES};${FUNCTION_DEFINES}" RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+endif()
+
 if(BUILD_SUITE)
 	enable_testing()
 	include_directories(AFTER ${CMOCKA_INCLUDE_DIRS})
