@@ -18,6 +18,7 @@
 #include <mgba/core/config.h>
 #include <mgba/core/core.h>
 #include <mgba/feature/netplay.h>
+#include <mgba/internal/gba/savedata.h>
 #include <mgba-util/crc32.h>
 #include <mgba-util/vfs.h>
 
@@ -99,8 +100,10 @@ QString NetplayController::start() {
 		if (!save.open(QIODevice::ReadOnly)) {
 			return tr("Could not read your save file %1").arg(m_params.savePath);
 		}
-		m_localSave = save.read(NETPLAY_MAX_SAVEDATA + 1);
-		if (m_localSave.size() > NETPLAY_MAX_SAVEDATA) {
+		// Saves from games with a clock (Pokémon Ruby/Sapphire/Emerald) carry mGBA's RTC footer after the data
+		const qint64 maxSave = NETPLAY_MAX_SAVEDATA + sizeof(GBASavedataRTCBuffer);
+		m_localSave = save.read(maxSave + 1);
+		if (m_localSave.size() > maxSave) {
 			return tr("Your save file is too large to be a GBA save");
 		}
 	}
@@ -384,9 +387,11 @@ QString NetplayController::writeBackSave(Machine* machine) {
 	size_t size = local->savedataClone(local, &sram);
 	QByteArray data(static_cast<const char*>(sram), size);
 	free(sram);
-	if (!size || data == m_localSave) {
+	if (!size || data == m_localSave.left(size)) {
 		return {};
 	}
+	// The clone holds only the save data; keep the file's RTC footer, if it had one
+	data += m_localSave.mid(size);
 	QString backup = m_params.savePath + QStringLiteral(".netplay-backup");
 	if (QFile::exists(m_params.savePath)) {
 		QFile::remove(backup);
