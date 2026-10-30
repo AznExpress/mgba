@@ -134,7 +134,8 @@ void NetplayView::pumpAudio() {
 }
 
 void NetplayView::pollInput() {
-	int gamepad = m_input ? m_input->pollEvents() : 0;
+	// Two windows on one PC share a controller; only the focused window should read it
+	int gamepad = (m_input && hasFocus()) ? m_input->pollEvents() : 0;
 	m_controller.setKeys((m_keyboard | gamepad) & 0x3FF);
 }
 
@@ -286,12 +287,17 @@ void NetplayView::drawStats(QPainter& painter) {
 		lines << tr("Desyncs %1, recovered %2").arg(stats.desyncs).arg(stats.resyncs);
 	}
 	QStringList held;
-	if (m_keyboard & (1 << GBA_KEY_A)) held << QStringLiteral("A");
-	if (m_keyboard & (1 << GBA_KEY_B)) held << QStringLiteral("B");
-	if (m_keyboard & (1 << GBA_KEY_START)) held << QStringLiteral("Start");
-	if (m_keyboard & (1 << GBA_KEY_SELECT)) held << QStringLiteral("Select");
-	if (m_keyboard & (1 << GBA_KEY_L)) held << QStringLiteral("L");
-	if (m_keyboard & (1 << GBA_KEY_R)) held << QStringLiteral("R");
+	quint16 keys = stats.keys;
+	if (keys & (1 << GBA_KEY_A)) held << QStringLiteral("A");
+	if (keys & (1 << GBA_KEY_B)) held << QStringLiteral("B");
+	if (keys & (1 << GBA_KEY_START)) held << QStringLiteral("Start");
+	if (keys & (1 << GBA_KEY_SELECT)) held << QStringLiteral("Select");
+	if (keys & (1 << GBA_KEY_L)) held << QStringLiteral("L");
+	if (keys & (1 << GBA_KEY_R)) held << QStringLiteral("R");
+	if (keys & (1 << GBA_KEY_UP)) held << QStringLiteral("U");
+	if (keys & (1 << GBA_KEY_DOWN)) held << QStringLiteral("D");
+	if (keys & (1 << GBA_KEY_LEFT)) held << QStringLiteral("Lf");
+	if (keys & (1 << GBA_KEY_RIGHT)) held << QStringLiteral("Rt");
 	lines << tr("Held %1").arg(held.isEmpty() ? tr("none") : held.join(QStringLiteral(" ")));
 	lines << tr("F3 hides this");
 

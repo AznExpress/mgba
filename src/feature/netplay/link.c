@@ -91,14 +91,29 @@ static void _startPlayer(struct NetplayLink* link, int player) {
 	}
 }
 
+static bool _allLatched(const struct NetplayLink* link) {
+	int p;
+	for (p = 0; p < link->nPlayers; ++p) {
+		if (!link->state.started[p]) {
+			return false;
+		}
+	}
+	return true;
+}
+
+static void _yieldRunning(struct NetplayLink* link, int player) {
+	if (link->running != player) {
+		return;
+	}
+	link->stops[player].stopped = true;
+	GBAInterrupt(_gba(link, player));
+}
+
 static void _finishPlayer(struct NetplayLink* link, int player, uint32_t cyclesLate) {
 	struct NetplayLinkState* state = &link->state;
 	int p;
-	// A short normal-mode transfer can end before a lagging partner reaches its start point; latch it now
-	for (p = 0; p < link->nPlayers; ++p) {
-		if (!state->started[p]) {
-			_startPlayer(link, p);
-		}
+	if (!_allLatched(link)) {
+		return;
 	}
 	state->finished[player] = 1;
 
@@ -187,16 +202,9 @@ static void _beginTransfer(struct NetplayLink* link, int player, uint16_t siocnt
 	memset(state->multiData, 0xFF, sizeof(state->multiData));
 	memset(state->normalData, 0xFF, sizeof(state->normalData));
 	_startPlayer(link, player);
-
-	// Let the initiator stop exactly at its own completion if that lands inside the current slice
-	if (link->running == player) {
-		struct mTiming* timing = link->cores[player]->timing;
-		struct NetplayLinkStop* stop = &link->stops[player];
-		if (mTimingIsScheduled(timing, &stop->event) && mTimingUntil(timing, &stop->event) > cycles) {
-			mTimingDeschedule(timing, &stop->event);
-			mTimingSchedule(timing, &stop->event, cycles);
-		}
-	}
+	// Stop the initiator here so the other GBAs can latch SIOMLT_SEND at transferStart,
+	// matching mGBA lockstep. Finishing first sent 0xFFFF for anyone who had not run yet.
+	_yieldRunning(link, player);
 }
 
 static uint64_t _nextEvent(const struct NetplayLink* link, int player) {
@@ -206,6 +214,9 @@ static uint64_t _nextEvent(const struct NetplayLink* link, int player) {
 	}
 	if (!state->started[player]) {
 		return state->transferStart;
+	}
+	if (!_allLatched(link)) {
+		return UINT64_MAX;
 	}
 	if (!state->finished[player]) {
 		return state->transferEnd;
@@ -239,11 +250,17 @@ static void _runCore(struct NetplayLink* link, int player, uint64_t target) {
 		if (now >= target) {
 			return;
 		}
+		if (link->state.transferActive && link->state.started[player] && !_allLatched(link)) {
+			return;
+		}
 		uint64_t event = _nextEvent(link, player);
 		if (event <= now) {
 			uint32_t late = (uint32_t) (now - event);
 			if (!link->state.started[player]) {
 				_startPlayer(link, player);
+				if (!_allLatched(link)) {
+					return;
+				}
 			} else {
 				_finishPlayer(link, player, late);
 			}

@@ -53,6 +53,7 @@ struct NetplayStats {
 	int sioMode = -1;
 	int sioReady = 0;
 	quint64 sioTransfers = 0;
+	quint16 keys = 0;
 };
 
 // Runs a netplay session on a worker thread: all players' cores, the rollback session and the network

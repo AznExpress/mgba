@@ -354,6 +354,8 @@ QString NetplayController::runSession() {
 				m_stats.sioMode = sioMode;
 				m_stats.sioReady = sioReady;
 				m_stats.sioTransfers = sioTransfers;
+				uint32_t last = session->frame ? session->frame - 1 : 0;
+				m_stats.keys = session->used[last % NETPLAY_INPUT_RING][m_params.slot];
 			}
 		}
 		NetplayClientSendBye(client.get(), NetplayNowMs());
